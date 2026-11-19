@@ -1,8 +1,11 @@
 package com.example.ui
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -25,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.EditNote
@@ -124,6 +129,33 @@ fun SarvaAiApp(
         }
     }
 
+    val micPermissionDeniedMsg = stringResource(R.string.voice_permission_denied_snackbar)
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.startVoiceInput()
+        } else {
+            viewModel.onVoicePermissionDenied(micPermissionDeniedMsg)
+        }
+    }
+
+    val handleVoiceInputClick = {
+        if (uiState.isListeningVoice) {
+            viewModel.stopVoiceInput()
+        } else {
+            val hasMicPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (hasMicPermission) {
+                viewModel.startVoiceInput()
+            } else {
+                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
     val launchPhotoPicker = {
         photoPickerLauncher.launch(
             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -181,6 +213,7 @@ fun SarvaAiApp(
                 onOpenDrawer = { scope.launch { drawerState.open() } },
                 onNewChat = viewModel::startNewChat,
                 onToggleTheme = viewModel::toggleTheme,
+                onToggleAutoSpeak = viewModel::toggleAutoSpeak,
                 onOpenPreviewInfo = { viewModel.setShowPreviewInfoDialog(true) },
                 onOpenCamera = { showCameraCapture = true },
                 onPickPhoto = launchPhotoPicker,
@@ -190,10 +223,12 @@ fun SarvaAiApp(
                 onPromptChange = viewModel::onPromptChanged,
                 onSendClick = viewModel::sendCurrentPrompt,
                 onStopClick = viewModel::stopGeneration,
+                onVoiceInputClick = handleVoiceInputClick,
                 onQuickPromptClick = viewModel::sendQuickPrompt,
                 onRemoveAttachment = viewModel::removePendingAttachment,
                 onInspectAttachment = viewModel::openAttachmentPreview,
                 onCopyResponse = copyToClipboard,
+                onToggleSpeakMessage = viewModel::toggleSpeakMessage,
                 onRegenerate = viewModel::regenerateLastResponse,
                 onDismissError = viewModel::dismissError
             )
@@ -272,6 +307,7 @@ private fun WorkspaceScaffold(
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
     onToggleTheme: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
     onOpenPreviewInfo: () -> Unit,
     onOpenCamera: () -> Unit,
     onPickPhoto: () -> Unit,
@@ -281,10 +317,12 @@ private fun WorkspaceScaffold(
     onPromptChange: (String) -> Unit,
     onSendClick: () -> Unit,
     onStopClick: () -> Unit,
+    onVoiceInputClick: () -> Unit,
     onQuickPromptClick: (String) -> Unit,
     onRemoveAttachment: (String) -> Unit,
     onInspectAttachment: (com.example.model.MediaAttachment) -> Unit,
     onCopyResponse: (String) -> Unit,
+    onToggleSpeakMessage: (Long, String) -> Unit,
     onRegenerate: () -> Unit,
     onDismissError: () -> Unit
 ) {
@@ -356,6 +394,32 @@ private fun WorkspaceScaffold(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = onToggleAutoSpeak,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("toggle_auto_speak_button")
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isAutoSpeakEnabled) {
+                                    Icons.AutoMirrored.Rounded.VolumeUp
+                                } else {
+                                    Icons.AutoMirrored.Rounded.VolumeOff
+                                },
+                                contentDescription = stringResource(
+                                    if (uiState.isAutoSpeakEnabled) {
+                                        R.string.cd_auto_speak_on
+                                    } else {
+                                        R.string.cd_auto_speak_off
+                                    }
+                                ),
+                                tint = if (uiState.isAutoSpeakEnabled) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                         IconButton(
                             onClick = onToggleTheme,
                             modifier = Modifier
@@ -435,9 +499,11 @@ private fun WorkspaceScaffold(
                 pendingAttachments = uiState.pendingAttachments,
                 isStreaming = uiState.generationState is GenerationState.Streaming,
                 isAttachingMedia = uiState.isAttachingMedia,
+                isListeningVoice = uiState.isListeningVoice,
                 onPromptChange = onPromptChange,
                 onSendClick = onSendClick,
                 onStopClick = onStopClick,
+                onVoiceInputClick = onVoiceInputClick,
                 onOpenCamera = onOpenCamera,
                 onPickPhoto = onPickPhoto,
                 onPickVideo = onPickVideo,
@@ -466,8 +532,10 @@ private fun WorkspaceScaffold(
                     messages = uiState.messages,
                     generationState = uiState.generationState,
                     isLiveAiEnabled = uiState.isLiveAiEnabled,
+                    speakingMessageId = uiState.speakingMessageId,
                     onAttachmentClick = onInspectAttachment,
                     onCopyClick = onCopyResponse,
+                    onToggleSpeakClick = onToggleSpeakMessage,
                     onRegenerateClick = onRegenerate,
                     onFollowUpClick = onQuickPromptClick,
                     onInfoBadgeClick = onOpenPreviewInfo,

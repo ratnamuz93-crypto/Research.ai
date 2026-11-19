@@ -1,6 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +35,8 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -42,8 +49,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -66,9 +75,11 @@ fun MultimodalComposer(
     pendingAttachments: List<MediaAttachment>,
     isStreaming: Boolean,
     isAttachingMedia: Boolean,
+    isListeningVoice: Boolean,
     onPromptChange: (String) -> Unit,
     onSendClick: () -> Unit,
     onStopClick: () -> Unit,
+    onVoiceInputClick: () -> Unit,
     onOpenCamera: () -> Unit,
     onPickPhoto: () -> Unit,
     onPickVideo: () -> Unit,
@@ -79,6 +90,16 @@ fun MultimodalComposer(
     modifier: Modifier = Modifier
 ) {
     val canSend = promptText.isNotBlank() || pendingAttachments.isNotEmpty()
+    val listenPulse = rememberInfiniteTransition(label = "mic_pulse")
+    val micAlpha by listenPulse.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(550),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "mic_alpha"
+    )
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -98,6 +119,41 @@ fun MultimodalComposer(
                     .fillMaxWidth()
                     .widthIn(max = 720.dp)
             ) {
+                AnimatedVisibility(visible = isListeningVoice) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .testTag("voice_listening_indicator")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.GraphicEq,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .alpha(micAlpha)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.voice_listening_status),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+
                 AnimatedVisibility(visible = pendingAttachments.isNotEmpty() || isAttachingMedia) {
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -136,7 +192,14 @@ fun MultimodalComposer(
                 Surface(
                     shape = RoundedCornerShape(26.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isListeningVoice) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        }
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
@@ -147,13 +210,21 @@ fun MultimodalComposer(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    .padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
                             ) {
                                 if (promptText.isEmpty()) {
                                     Text(
-                                        text = stringResource(R.string.composer_placeholder),
+                                        text = if (isListeningVoice) {
+                                            stringResource(R.string.voice_listening_status)
+                                        } else {
+                                            stringResource(R.string.composer_placeholder)
+                                        },
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isListeningVoice) {
+                                            MaterialTheme.colorScheme.tertiary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        }
                                     )
                                 }
                                 BasicTextField(
@@ -172,6 +243,45 @@ fun MultimodalComposer(
                                         .fillMaxWidth()
                                         .testTag("prompt_input_field")
                                 )
+                            }
+
+                            // Hands-free SpeechRecognizer Microphone Button inside chat input field
+                            Surface(
+                                onClick = onVoiceInputClick,
+                                shape = CircleShape,
+                                color = if (isListeningVoice) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    Color.Transparent
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .testTag("voice_input_mic_button")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isListeningVoice) {
+                                            Icons.Rounded.GraphicEq
+                                        } else {
+                                            Icons.Rounded.Mic
+                                        },
+                                        contentDescription = stringResource(
+                                            if (isListeningVoice) {
+                                                R.string.cd_voice_input_stop
+                                            } else {
+                                                R.string.cd_voice_input_start
+                                            }
+                                        ),
+                                        tint = if (isListeningVoice) {
+                                            MaterialTheme.colorScheme.onTertiary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .alpha(if (isListeningVoice) micAlpha else 1f)
+                                    )
+                                }
                             }
                         }
 

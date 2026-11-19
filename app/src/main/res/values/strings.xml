@@ -88,4 +88,23 @@
     <string name="camera_attach_only">Attach</string>
     <string name="camera_analyze_now">Analyze Now</string>
     <string name="camera_captured_badge">Captured with CameraX</string>
+
+    <!-- Voice Read-Aloud (TTS) -->
+    <string name="cd_auto_speak_on">Auto voice read-aloud is on. Tap to mute.</string>
+    <string name="cd_auto_speak_off">Auto voice read-aloud is off. Tap to enable.</string>
+    <string name="cd_speak_response">Read answer aloud</string>
+    <string name="cd_stop_speaking">Stop speaking</string>
+    <string name="voice_speaking_label">Speaking…</string>
+    <string name="voice_listen_label">Listen</string>
+    <string name="voice_stop_label">Stop</string>
+    <string name="voice_auto_on_snackbar">Voice read-aloud ON</string>
+    <string name="voice_auto_off_snackbar">Voice read-aloud muted</string>
+    <string name="voice_unavailable_snackbar">Text-to-Speech is not ready on this device</string>
+
+    <!-- Voice Input (SpeechRecognizer) -->
+    <string name="cd_voice_input_start">Start voice input</string>
+    <string name="cd_voice_input_stop">Stop voice input</string>
+    <string name="voice_listening_status">Listening… speak your question</string>
+    <string name="voice_permission_denied_snackbar">Microphone permission is required for voice input</string>
+    <string name="voice_recognizer_unavailable">Speech recognition is not available on this device</string>
 </resources>

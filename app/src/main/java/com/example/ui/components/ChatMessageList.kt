@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Description
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.StopCircle
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,8 +81,10 @@ fun ChatMessageList(
     messages: List<ChatMessage>,
     generationState: GenerationState,
     isLiveAiEnabled: Boolean,
+    speakingMessageId: Long?,
     onAttachmentClick: (MediaAttachment) -> Unit,
     onCopyClick: (String) -> Unit,
+    onToggleSpeakClick: (Long, String) -> Unit,
     onRegenerateClick: () -> Unit,
     onFollowUpClick: (String) -> Unit,
     onInfoBadgeClick: () -> Unit,
@@ -129,6 +133,7 @@ fun ChatMessageList(
                     AssistantMessageCard(
                         text = message.text,
                         isStreaming = false,
+                        isSpeaking = speakingMessageId == message.id,
                         isSamplePreview = message.isSamplePreview || !isLiveAiEnabled,
                         suggestedFollowUps = if (isLatestAssistant && generationState is GenerationState.Idle) {
                             message.suggestedFollowUps
@@ -137,6 +142,7 @@ fun ChatMessageList(
                         },
                         showRegenerate = isLatestAssistant && generationState is GenerationState.Idle,
                         onCopyClick = { onCopyClick(message.text) },
+                        onSpeakToggleClick = { onToggleSpeakClick(message.id, message.text) },
                         onRegenerateClick = onRegenerateClick,
                         onFollowUpClick = onFollowUpClick,
                         onInfoBadgeClick = onInfoBadgeClick
@@ -155,10 +161,12 @@ fun ChatMessageList(
                     AssistantMessageCard(
                         text = generationState.partialText,
                         isStreaming = true,
+                        isSpeaking = false,
                         isSamplePreview = !isLiveAiEnabled,
                         suggestedFollowUps = emptyList(),
                         showRegenerate = false,
                         onCopyClick = {},
+                        onSpeakToggleClick = {},
                         onRegenerateClick = {},
                         onFollowUpClick = {},
                         onInfoBadgeClick = onInfoBadgeClick
@@ -420,10 +428,12 @@ private fun MessageAttachmentPreviewTile(
 private fun AssistantMessageCard(
     text: String,
     isStreaming: Boolean,
+    isSpeaking: Boolean,
     isSamplePreview: Boolean,
     suggestedFollowUps: List<String>,
     showRegenerate: Boolean,
     onCopyClick: () -> Unit,
+    onSpeakToggleClick: () -> Unit,
     onRegenerateClick: () -> Unit,
     onFollowUpClick: (String) -> Unit,
     onInfoBadgeClick: () -> Unit
@@ -461,7 +471,7 @@ private fun AssistantMessageCard(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .size(17.dp)
-                        .alpha(if (isStreaming) pulseAlpha else 1f)
+                        .alpha(if (isStreaming || isSpeaking) pulseAlpha else 1f)
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -471,7 +481,33 @@ private fun AssistantMessageCard(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            if (isSamplePreview) {
+            if (isSpeaking) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(13.dp)
+                                .alpha(pulseAlpha)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.voice_speaking_label),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            } else if (isSamplePreview) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
                     shape = RoundedCornerShape(50),
@@ -510,7 +546,14 @@ private fun AssistantMessageCard(
                 bottomEnd = 22.dp
             ),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(
+                1.dp,
+                if (isSpeaking) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                }
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -528,11 +571,58 @@ private fun AssistantMessageCard(
                 }
 
                 if (!isStreaming) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        Surface(
+                            onClick = onSpeakToggleClick,
+                            shape = RoundedCornerShape(50),
+                            color = if (isSpeaking) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+                            },
+                            modifier = Modifier
+                                .height(48.dp)
+                                .padding(vertical = 5.dp)
+                                .testTag("speak_response_button")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isSpeaking) {
+                                        Icons.Rounded.StopCircle
+                                    } else {
+                                        Icons.AutoMirrored.Rounded.VolumeUp
+                                    },
+                                    contentDescription = stringResource(
+                                        if (isSpeaking) R.string.cd_stop_speaking else R.string.cd_speak_response
+                                    ),
+                                    tint = if (isSpeaking) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(
+                                        if (isSpeaking) R.string.voice_stop_label else R.string.voice_listen_label
+                                    ),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isSpeaking) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    }
+                                )
+                            }
+                        }
                         IconButton(
                             onClick = onCopyClick,
                             modifier = Modifier

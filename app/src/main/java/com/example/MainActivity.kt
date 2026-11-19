@@ -13,6 +13,8 @@ import com.example.data.ChatRepository
 import com.example.data.ai.PlaceholderAiRepository
 import com.example.data.local.AppDatabase
 import com.example.data.media.MediaInspector
+import com.example.data.voice.VoiceInputRecognizer
+import com.example.data.voice.VoiceSpeaker
 import com.example.ui.ChatViewModel
 import com.example.ui.SarvaAiApp
 import com.example.ui.theme.SarvaAiTheme
@@ -25,6 +27,8 @@ class MainActivity : ComponentActivity() {
         val database = AppDatabase.getInstance(applicationContext)
         val mediaInspector = MediaInspector(applicationContext)
         val aiRepository = PlaceholderAiRepository()
+        val voiceSpeaker = VoiceSpeaker(applicationContext)
+        val voiceInputRecognizer = VoiceInputRecognizer(applicationContext)
         val chatRepository = ChatRepository(
             chatDao = database.chatDao(),
             mediaInspector = mediaInspector,
@@ -33,7 +37,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val chatViewModel: ChatViewModel = viewModel(
-                factory = ChatViewModel.Factory(chatRepository)
+                factory = ChatViewModel.Factory(
+                    chatRepository,
+                    voiceSpeaker,
+                    voiceInputRecognizer
+                )
             )
             val uiState by chatViewModel.uiState.collectAsStateWithLifecycle()
 

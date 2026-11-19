@@ -6,6 +6,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.ChatRepository
+import com.example.data.voice.VoiceInputRecognizer
+import com.example.data.voice.VoiceInputState
+import com.example.data.voice.VoicePlaybackState
+import com.example.data.voice.VoiceSpeaker
 import com.example.model.AttachmentType
 import com.example.model.ChatMessage
 import com.example.model.ChatSession
@@ -45,6 +49,9 @@ data class ChatUiState(
     val generationState: GenerationState = GenerationState.Idle,
     val isLiveAiEnabled: Boolean = false,
     val isDarkTheme: Boolean = true,
+    val isAutoSpeakEnabled: Boolean = true,
+    val speakingMessageId: Long? = null,
+    val isListeningVoice: Boolean = false,
     val inspectedAttachment: MediaAttachment? = null,
     val showPreviewInfoDialog: Boolean = false,
     val isAttachingMedia: Boolean = false
@@ -56,8 +63,12 @@ sealed interface ChatUiEvent {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
-    private val repository: ChatRepository
+    private val repository: ChatRepository,
+    private val voiceSpeaker: VoiceSpeaker,
+    private val voiceInputRecognizer: VoiceInputRecognizer
 ) : ViewModel() {
+
+    private var promptBeforeVoiceInput: String = ""
 
     private val activeSessionId = MutableStateFlow<Long?>(null)
     private val pendingAttachments = MutableStateFlow<List<MediaAttachment>>(emptyList())
@@ -65,6 +76,7 @@ class ChatViewModel(
     private val searchQuery = MutableStateFlow("")
     private val generationState = MutableStateFlow<GenerationState>(GenerationState.Idle)
     private val isDarkTheme = MutableStateFlow(true)
+    private val isAutoSpeakEnabled = MutableStateFlow(true)
     private val inspectedAttachment = MutableStateFlow<MediaAttachment?>(null)
     private val showPreviewInfoDialog = MutableStateFlow(false)
     private val isAttachingMedia = MutableStateFlow(false)
@@ -110,12 +122,27 @@ class ChatViewModel(
         )
     }
 
+    private data class VoiceSlice(
+        val autoSpeak: Boolean,
+        val playback: VoicePlaybackState,
+        val input: VoiceInputState
+    )
+
+    private val voiceSliceFlow = combine(
+        isAutoSpeakEnabled,
+        voiceSpeaker.playbackState,
+        voiceInputRecognizer.inputState
+    ) { autoSpeak, playback, input ->
+        VoiceSlice(autoSpeak, playback, input)
+    }
+
     val uiState: StateFlow<ChatUiState> = combine(
         activeSessionId,
         sessionsFlow,
         activeMessagesFlow,
-        controlSliceFlow
-    ) { sessionId, sessions, messages, controls ->
+        controlSliceFlow,
+        voiceSliceFlow
+    ) { sessionId, sessions, messages, controls, voice ->
         val filteredSessions = if (controls.search.isBlank()) {
             sessions
         } else {
@@ -134,6 +161,9 @@ class ChatViewModel(
             generationState = controls.genState,
             isLiveAiEnabled = repository.isLiveAiEnabled,
             isDarkTheme = controls.dark,
+            isAutoSpeakEnabled = voice.autoSpeak,
+            speakingMessageId = voice.playback.speakingMessageId,
+            isListeningVoice = voice.input.isListening,
             inspectedAttachment = controls.inspected,
             showPreviewInfoDialog = controls.infoDialog,
             isAttachingMedia = controls.attaching
@@ -156,6 +186,76 @@ class ChatViewModel(
         isDarkTheme.update { !it }
     }
 
+    fun toggleAutoSpeak() {
+        val next = !isAutoSpeakEnabled.value
+        isAutoSpeakEnabled.value = next
+        if (!next) {
+            voiceSpeaker.stop()
+        }
+        viewModelScope.launch {
+            _events.emit(
+                ChatUiEvent.ShowSnackbar(
+                    if (next) "Voice read-aloud ON" else "Voice read-aloud muted"
+                )
+            )
+        }
+    }
+
+    fun toggleSpeakMessage(messageId: Long, text: String) {
+        if (voiceSpeaker.playbackState.value.speakingMessageId == messageId) {
+            voiceSpeaker.stop()
+        } else {
+            val started = voiceSpeaker.speak(messageId, text)
+            if (!started) {
+                viewModelScope.launch {
+                    _events.emit(ChatUiEvent.ShowSnackbar("Text-to-Speech is not ready on this device"))
+                }
+            }
+        }
+    }
+
+    fun startVoiceInput() {
+        if (generationState.value is GenerationState.Streaming) {
+            stopGeneration()
+        }
+        voiceSpeaker.stop()
+        promptBeforeVoiceInput = promptInput.value.trim()
+
+        voiceInputRecognizer.startListening(
+            onPartialResult = { partial ->
+                promptInput.value = combineVoiceText(promptBeforeVoiceInput, partial)
+            },
+            onFinalResult = { spoken ->
+                val finalPrompt = combineVoiceText(promptBeforeVoiceInput, spoken)
+                promptBeforeVoiceInput = ""
+                promptInput.value = finalPrompt
+                if (finalPrompt.isNotBlank()) {
+                    sendCurrentPrompt()
+                }
+            },
+            onError = { errorMsg ->
+                promptBeforeVoiceInput = ""
+                viewModelScope.launch {
+                    _events.emit(ChatUiEvent.ShowSnackbar(errorMsg))
+                }
+            }
+        )
+    }
+
+    fun stopVoiceInput() {
+        promptBeforeVoiceInput = ""
+        voiceInputRecognizer.stopListening()
+    }
+
+    fun onVoicePermissionDenied(message: String) {
+        viewModelScope.launch {
+            _events.emit(ChatUiEvent.ShowSnackbar(message))
+        }
+    }
+
+    private fun combineVoiceText(prefix: String, spoken: String): String =
+        if (prefix.isBlank()) spoken else "$prefix $spoken"
+
     fun openAttachmentPreview(attachment: MediaAttachment) {
         inspectedAttachment.value = attachment
     }
@@ -170,6 +270,8 @@ class ChatViewModel(
 
     fun startNewChat() {
         stopGeneration()
+        voiceSpeaker.stop()
+        voiceInputRecognizer.stopListening()
         activeSessionId.value = null
         pendingAttachments.value = emptyList()
         promptInput.value = ""
@@ -179,6 +281,8 @@ class ChatViewModel(
     fun selectSession(sessionId: Long) {
         if (activeSessionId.value == sessionId) return
         stopGeneration()
+        voiceSpeaker.stop()
+        voiceInputRecognizer.stopListening()
         activeSessionId.value = sessionId
         pendingAttachments.value = emptyList()
         generationState.value = GenerationState.Idle
@@ -188,6 +292,8 @@ class ChatViewModel(
         viewModelScope.launch {
             if (activeSessionId.value == sessionId) {
                 stopGeneration()
+                voiceSpeaker.stop()
+                voiceInputRecognizer.stopListening()
                 activeSessionId.value = null
             }
             repository.deleteSession(sessionId)
@@ -252,6 +358,7 @@ class ChatViewModel(
 
         promptInput.value = ""
         pendingAttachments.value = emptyList()
+        voiceSpeaker.stop()
 
         activeGenerationJob = viewModelScope.launch {
             try {
@@ -374,7 +481,7 @@ class ChatViewModel(
         }
 
         if (finalText.isNotBlank()) {
-            repository.saveMessage(
+            val savedMessageId = repository.saveMessage(
                 ChatMessage(
                     sessionId = sessionId,
                     role = MessageRole.ASSISTANT,
@@ -383,6 +490,9 @@ class ChatViewModel(
                     suggestedFollowUps = finalFollowUps
                 )
             )
+            if (isAutoSpeakEnabled.value) {
+                voiceSpeaker.speak(savedMessageId, finalText)
+            }
         }
         generationState.value = GenerationState.Idle
     }
@@ -415,12 +525,22 @@ class ChatViewModel(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        voiceSpeaker.shutdown()
+        voiceInputRecognizer.destroy()
+    }
+
     private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
-    class Factory(private val repository: ChatRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: ChatRepository,
+        private val voiceSpeaker: VoiceSpeaker,
+        private val voiceInputRecognizer: VoiceInputRecognizer
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return ChatViewModel(repository) as T
+            return ChatViewModel(repository, voiceSpeaker, voiceInputRecognizer) as T
         }
     }
 }
