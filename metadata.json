@@ -1,0 +1,6 @@
+{
+  "name": "Sarva AI",
+  "description": "All-in-one multimodal AI assistant to upload photos, videos, and documents or data files and ask anything about them.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

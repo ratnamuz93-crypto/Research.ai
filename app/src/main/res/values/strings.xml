@@ -1,0 +1,91 @@
+<resources>
+    <string name="app_name">Sarva AI</string>
+    <string name="app_tagline">All-in-One Multimodal Assistant</string>
+
+    <!-- Top bar & navigation -->
+    <string name="cd_open_drawer">Open chat history</string>
+    <string name="cd_new_chat">Start a new chat</string>
+    <string name="cd_toggle_theme">Toggle dark or light theme</string>
+    <string name="cd_welcome_artwork">Sarva AI multimodal prism artwork</string>
+    <string name="cd_ai_avatar">Sarva AI assistant emblem</string>
+    <string name="cd_remove_attachment">Remove attachment</string>
+    <string name="cd_attach_photo">Upload photo</string>
+    <string name="cd_attach_video">Upload video</string>
+    <string name="cd_attach_data">Upload file or data</string>
+    <string name="cd_more_attachments">Open attachment options</string>
+    <string name="cd_send_message">Send message</string>
+    <string name="cd_stop_generation">Stop generating response</string>
+    <string name="cd_copy_response">Copy response</string>
+    <string name="cd_regenerate_response">Regenerate response</string>
+    <string name="cd_delete_session">Delete conversation</string>
+    <string name="cd_close_preview">Close preview</string>
+    <string name="cd_play_video_badge">Video attachment</string>
+    <string name="cd_info_preview_mode">Learn about Firebase AI mode</string>
+
+    <!-- Preview mode notice -->
+    <string name="preview_banner_title">Sample Preview Mode</string>
+    <string name="preview_banner_subtitle">Live Gemini AI requires Firebase</string>
+    <string name="preview_badge_label">Sample Preview • Requires Firebase</string>
+    <string name="preview_dialog_title">Connect Live Gemini AI</string>
+    <string name="preview_dialog_body">Sarva AI is currently running in Sample Preview Mode because Firebase setup was skipped. You can upload photos, videos, PDFs, CSVs, and documents to inspect their metadata and preview the complete multimodal experience.\n\nTo enable live Gemini analysis for your photos, videos, and files, enable Firebase AI Logic in AI Studio.</string>
+    <string name="preview_dialog_dismiss">Got it</string>
+
+    <!-- Welcome screen -->
+    <string name="welcome_headline">Upload anything.\nAsk everything.</string>
+    <string name="welcome_subtitle">Drop a photo, video, or data file — ask questions in Hindi, Hinglish, or English in one unified AI workspace.</string>
+    <string name="tile_photo_title">Photo</string>
+    <string name="tile_photo_desc">Identify objects, read text, explain scenes</string>
+    <string name="tile_video_title">Video</string>
+    <string name="tile_video_desc">Ask about clips, actions &amp; key moments</string>
+    <string name="tile_data_title">Data &amp; Docs</string>
+    <string name="tile_data_desc">PDF, CSV, JSON, TXT, audio &amp; more</string>
+    <string name="starter_section_label">Try asking</string>
+    <string name="starter_prompt_1">Explain everything inside this photo</string>
+    <string name="starter_prompt_2">Summarize key moments of this video</string>
+    <string name="starter_prompt_3">Analyze data &amp; key insights from my file</string>
+    <string name="starter_prompt_4">Translate &amp; explain in simple Hinglish</string>
+
+    <!-- Composer & Attachment Sheet -->
+    <string name="composer_placeholder">Ask about photos, videos, data…</string>
+    <string name="sheet_attach_title">Add to your prompt</string>
+    <string name="sheet_attach_subtitle">Combine photos, videos, and data files together in one question</string>
+    <string name="attachment_photo_label">Photo</string>
+    <string name="attachment_video_label">Video</string>
+    <string name="attachment_data_label">File</string>
+    <string name="copied_snackbar">Copied to clipboard</string>
+    <string name="attachment_added_snackbar">Attached %1$s</string>
+    <string name="attachment_error_snackbar">Could not read the selected file</string>
+
+    <!-- History Drawer -->
+    <string name="drawer_title">Conversations</string>
+    <string name="drawer_new_chat">New Chat</string>
+    <string name="drawer_search_placeholder">Search conversations…</string>
+    <string name="drawer_empty_title">No chats yet</string>
+    <string name="drawer_empty_subtitle">Upload a photo, video, or data file to start your first conversation.</string>
+    <string name="drawer_session_default_title">New Multimodal Chat</string>
+    <string name="message_thinking">Analyzing your input…</string>
+    <string name="preview_modal_details">File Details</string>
+    <string name="preview_modal_snippet">Extracted Text Preview</string>
+
+    <!-- CameraX Capture -->
+    <string name="tile_camera_title">Camera</string>
+    <string name="tile_camera_desc">Snap a live photo &amp; ask AI instantly</string>
+    <string name="cd_open_camera">Open camera to take photo</string>
+    <string name="cd_close_camera">Close camera</string>
+    <string name="cd_capture_photo">Take photo</string>
+    <string name="cd_switch_camera">Switch front or back camera</string>
+    <string name="cd_flash_auto">Flash auto</string>
+    <string name="cd_flash_on">Flash on</string>
+    <string name="cd_flash_off">Flash off</string>
+    <string name="camera_permission_title">Camera Access Needed</string>
+    <string name="camera_permission_body">Allow camera access so Sarva AI can capture photos directly for multimodal visual analysis.</string>
+    <string name="camera_permission_grant">Allow Camera</string>
+    <string name="camera_permission_cancel">Not Now</string>
+    <string name="camera_unavailable_error">Camera could not be started on this device.</string>
+    <string name="camera_capture_error">Failed to capture photo. Please try again.</string>
+    <string name="camera_hint_tap_focus">Tap anywhere to focus</string>
+    <string name="camera_retake">Retake</string>
+    <string name="camera_attach_only">Attach</string>
+    <string name="camera_analyze_now">Analyze Now</string>
+    <string name="camera_captured_badge">Captured with CameraX</string>
+</resources>
